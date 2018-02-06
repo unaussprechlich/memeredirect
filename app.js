@@ -70,6 +70,7 @@ app.get("/*", function (req, res, next) {
                 { $sample: { size: 1 } }
             ]).exec();
             console.log(JSON.stringify(result));
+            res.status(302);
             res.redirect(result[0].url);
         }
         catch (err) {
