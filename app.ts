@@ -23,7 +23,7 @@ server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
 
-function onError(error) {
+    function onError(error) {
     if (error.syscall !== 'listen') throw error;
 
     const bind = typeof port === 'string'
@@ -67,6 +67,15 @@ const Link = new Schema({
 
 const LinkModel = mongoose.model<ILink>("Link", Link);
 
+interface IClick extends mongoose.Document{
+    date : Date
+}
+
+const Click = new Schema({
+    date : Date
+});
+
+const ClickModel = mongoose.model<IClick>("click", Click);
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -83,9 +92,10 @@ app.get("/*", async function (req, res, next) {
         const result = await LinkModel.aggregate([
             { $sample: { size: 1 } }
         ]).exec() ;
-        console.log(JSON.stringify(result));
         res.status(302);
         res.redirect(result[0].url);
+        const click = new ClickModel({date : Date.now()});
+        await click.save();
     }catch (err){
         console.log(err);
         next(err)

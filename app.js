@@ -58,6 +58,10 @@ const Link = new mongoose_1.Schema({
     url: String
 });
 const LinkModel = mongoose.model("Link", Link);
+const Click = new mongoose_1.Schema({
+    date: Date
+});
+const ClickModel = mongoose.model("click", Click);
 app.set('views', path.join(__dirname, 'views'));
 app.use(logger('dev'));
 app.use(bodyParser.json());
@@ -69,9 +73,10 @@ app.get("/*", function (req, res, next) {
             const result = yield LinkModel.aggregate([
                 { $sample: { size: 1 } }
             ]).exec();
-            console.log(JSON.stringify(result));
             res.status(302);
             res.redirect(result[0].url);
+            const click = new ClickModel({ date: Date.now() });
+            yield click.save();
         }
         catch (err) {
             console.log(err);
