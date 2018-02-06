@@ -78,7 +78,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(cookieParser());
 
-app.get("/", async function (req, res, next) {
+app.get("/*", async function (req, res, next) {
     try{
         const result = await LinkModel.aggregate([
             { $sample: { size: 1 } }

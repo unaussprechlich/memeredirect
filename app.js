@@ -63,7 +63,7 @@ app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.get("/", function (req, res, next) {
+app.get("/*", function (req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const result = yield LinkModel.aggregate([
