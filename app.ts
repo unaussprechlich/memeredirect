@@ -1,119 +1,75 @@
-import {Schema} from "mongoose";
-require("mongoose").Promise = global.Promise;
-import  * as mongoose from "mongoose";
-import * as path from "path"
-import * as logger from 'morgan'
-import * as express from "express"
+import * as Hapi from "hapi"
+import {links} from "./Links";
 
-import cookieParser = require('cookie-parser');
-import bodyParser = require('body-parser');
+export class Service{
 
-const port = process.env.PORT || 3002;
+    readonly server: Hapi.Server;
+    static INSTANCE : Service;
 
-const app = express();
+    private constructor(){
+        this.server = new Hapi.Server({
+            host : '0.0.0.0',
+            port : process.env.PORT || 3000
+        });
 
-const debug = require('debug')('memeredirect:server');
-import http = require('http');
+        this.server.route({
+            method: 'GET',
+            path: '/{path*}',
+            handler: async (request, h) => {
+                try {
+                    const url = links[Math.floor(Math.random()*links.length)].toString()
+                    console.log(new Date().toISOString() + " | "+ url);
+                    return h.redirect(url)
+                }catch (e) {
+                    console.error(e);
+                    return e
+                }
+            }
+        });
 
-app.set('port', port);
+        this.server.route({
+            method: 'GET',
+            path: "/link",
+            handler: async (request) => {
+                try{
+                    const url = links[Math.floor(Math.random()*links.length)].toString()
+                    console.log(new Date().toISOString() + " | "+ url);
+                    return url;
+                }catch (e) {
+                    console.error(e);
+                    return e
+                }
+            },
+            options : {
+                cors : true
+            }
+        });
 
-const server = http.createServer(app);
+        this.server.route({
+            method: 'GET',
+            path: "/health",
+            handler: (request, h) => {
+                return "Thx, I'm fine!";
+            }
+        });
+        Service.INSTANCE = this;
+    }
 
-server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
-
-    function onError(error) {
-    if (error.syscall !== 'listen') throw error;
-
-    const bind = typeof port === 'string'
-        ? 'Pipe ' + port
-        : 'Port ' + port;
-
-    // handle specific listen errors with friendly messages
-    switch (error.code) {
-        case 'EACCES':
-            console.error(bind + ' requires elevated privileges');
-            process.exit(1);
-            break;
-        case 'EADDRINUSE':
-            console.error(bind + ' is already in use');
-            process.exit(1);
-            break;
-        default:
-            throw error;
+    //Singleton
+    static async start() : Promise<Service>{
+        if(Service.INSTANCE) return Service.INSTANCE;
+        try {
+            Service.INSTANCE = new Service();
+            await Service.INSTANCE.server.start();
+            console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+            console.log(`Server running at: ${Service.INSTANCE.server.info.uri}`);
+            console.log("Service: Memeredirect");
+            console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+        } catch (e) {
+            console.log(e);
+        }
+        return Service.INSTANCE;
     }
 }
 
-function onListening() {
-    const addr = server.address();
-    const bind = typeof addr === 'string'
-        ? 'pipe ' + addr
-        : 'port ' + addr.port;
-    debug('Listening on ' + bind);
-}
-
-mongoose.connect('mongodb://localhost/memeredirect').then(() => {
-    console.log("Connected to MongoDB!")
-});
-
-interface ILink extends mongoose.Document{
-    url : String
-}
-
-const Link = new Schema({
-    url : String
-});
-
-const LinkModel = mongoose.model<ILink>("Link", Link);
-
-interface IClick extends mongoose.Document{
-    date : Date
-}
-
-const Click = new Schema({
-    date : Date
-});
-
-const ClickModel = mongoose.model<IClick>("click", Click);
-
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-
-app.use(logger('dev'));
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-
-app.use(cookieParser());
-
-app.get("/*", async function (req, res, next) {
-    try{
-        const result = await LinkModel.aggregate([
-            { $sample: { size: 1 } }
-        ]).exec() ;
-        res.status(302);
-        res.redirect(result[0].url);
-        const click = new ClickModel({date : Date.now()});
-        await click.save();
-    }catch (err){
-        console.log(err);
-        next(err)
-    }
-});
-
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-    next(404);
-});
-
-// error handler
-app.use(function(err, req, res, next) {
-    // set locals, only providing error in development
-    res.locals.message = err.message;
-    res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-    // render the error page
-    res.status(err.status|| 500);
-    res.render("error.pug");
-});
+Service.start().catch(console.error);

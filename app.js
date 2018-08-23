@@ -8,88 +8,74 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const mongoose_1 = require("mongoose");
-require("mongoose").Promise = global.Promise;
-const mongoose = require("mongoose");
-const path = require("path");
-const logger = require("morgan");
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const bodyParser = require("body-parser");
-const port = process.env.PORT || 3002;
-const app = express();
-const debug = require('debug')('memeredirect:server');
-const http = require("http");
-app.set('port', port);
-const server = http.createServer(app);
-server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
-function onError(error) {
-    if (error.syscall !== 'listen')
-        throw error;
-    const bind = typeof port === 'string'
-        ? 'Pipe ' + port
-        : 'Port ' + port;
-    switch (error.code) {
-        case 'EACCES':
-            console.error(bind + ' requires elevated privileges');
-            process.exit(1);
-            break;
-        case 'EADDRINUSE':
-            console.error(bind + ' is already in use');
-            process.exit(1);
-            break;
-        default:
-            throw error;
+const Hapi = require("hapi");
+const Links_1 = require("./Links");
+class Service {
+    constructor() {
+        this.server = new Hapi.Server({
+            host: '0.0.0.0',
+            port: process.env.PORT || 3000
+        });
+        this.server.route({
+            method: 'GET',
+            path: '/{path*}',
+            handler: (request, h) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const url = Links_1.links[Math.floor(Math.random() * Links_1.links.length)].toString();
+                    console.log(new Date().toISOString() + " | " + url);
+                    return h.redirect(url);
+                }
+                catch (e) {
+                    console.error(e);
+                    return e;
+                }
+            })
+        });
+        this.server.route({
+            method: 'GET',
+            path: "/link",
+            handler: (request) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const url = Links_1.links[Math.floor(Math.random() * Links_1.links.length)].toString();
+                    console.log(new Date().toISOString() + " | " + url);
+                    return url;
+                }
+                catch (e) {
+                    console.error(e);
+                    return e;
+                }
+            }),
+            options: {
+                cors: true
+            }
+        });
+        this.server.route({
+            method: 'GET',
+            path: "/health",
+            handler: (request, h) => {
+                return "Thx, I'm fine!";
+            }
+        });
+        Service.INSTANCE = this;
+    }
+    static start() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (Service.INSTANCE)
+                return Service.INSTANCE;
+            try {
+                Service.INSTANCE = new Service();
+                yield Service.INSTANCE.server.start();
+                console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+                console.log(`Server running at: ${Service.INSTANCE.server.info.uri}`);
+                console.log("Service: Memeredirect");
+                console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+            }
+            catch (e) {
+                console.log(e);
+            }
+            return Service.INSTANCE;
+        });
     }
 }
-function onListening() {
-    const addr = server.address();
-    const bind = typeof addr === 'string'
-        ? 'pipe ' + addr
-        : 'port ' + addr.port;
-    debug('Listening on ' + bind);
-}
-mongoose.connect('mongodb://localhost/memeredirect').then(() => {
-    console.log("Connected to MongoDB!");
-});
-const Link = new mongoose_1.Schema({
-    url: String
-});
-const LinkModel = mongoose.model("Link", Link);
-const Click = new mongoose_1.Schema({
-    date: Date
-});
-const ClickModel = mongoose.model("click", Click);
-app.set('views', path.join(__dirname, 'views'));
-app.use(logger('dev'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.get("/*", function (req, res, next) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const result = yield LinkModel.aggregate([
-                { $sample: { size: 1 } }
-            ]).exec();
-            res.status(302);
-            res.redirect(result[0].url);
-            const click = new ClickModel({ date: Date.now() });
-            yield click.save();
-        }
-        catch (err) {
-            console.log(err);
-            next(err);
-        }
-    });
-});
-app.use(function (req, res, next) {
-    next(404);
-});
-app.use(function (err, req, res, next) {
-    res.locals.message = err.message;
-    res.locals.error = req.app.get('env') === 'development' ? err : {};
-    res.status(err.status || 500);
-    res.render("error.pug");
-});
+exports.Service = Service;
+Service.start().catch(console.error);
